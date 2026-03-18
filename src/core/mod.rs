@@ -1,3 +1,3 @@
 mod env;
 
-pub use env::{LiferayProject, ProjectType, Workspace};
+pub use env::{LiferayProject, Workspace};

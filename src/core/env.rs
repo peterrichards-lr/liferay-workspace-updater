@@ -1,3 +1,5 @@
+use anyhow::Context;
+use regex::Regex;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -5,22 +7,12 @@ pub trait Workspace {
     /// Finds the root of the Liferay project (DXP, LXC, or Client Extension)
     fn find_root(&self) -> anyhow::Result<PathBuf>;
 
-    /// Detects the type of Liferay project
-    fn detect_type(&self, root: &Path) -> ProjectType;
+    /// Returns the workspace plugin version if detectable from settings.gradle
+    fn get_workspace_plugin_version(&self, root: &Path) -> anyhow::Result<String>;
 
-    /// Returns the Liferay version if detectable (e.g. from gradle.properties)
-    fn get_liferay_version(&self, root: &Path) -> Option<String>;
-
-    /// Specifically for local DXP: Finds the Tomcat directory inside 'bundles'
-    fn find_tomcat(&self, root: &Path) -> anyhow::Result<PathBuf>;
-}
-
-#[derive(Debug, PartialEq)]
-pub enum ProjectType {
-    LiferayWorkspace,
-    LiferayCloud,
-    ClientExtension,
-    Unknown,
+    /// Updates the workspace plugin version in settings.gradle
+    fn update_workspace_plugin_version(&self, root: &Path, new_version: &str)
+        -> anyhow::Result<()>;
 }
 
 pub struct LiferayProject {
@@ -31,20 +23,8 @@ impl Workspace for LiferayProject {
     fn find_root(&self) -> anyhow::Result<PathBuf> {
         let mut path = self.current_dir.clone();
         loop {
-            // Liferay Workspace (Traditional)
-            if path.join("bundles").exists()
-                || path.join("gradle.properties").exists() && path.join("modules").exists()
-            {
-                return Ok(path);
-            }
-
-            // Liferay Cloud
-            if path.join("liferay").exists() || path.join("webserver").exists() {
-                return Ok(path);
-            }
-
-            // Client Extension
-            if path.join("client-extension.yaml").exists() {
+            // Liferay Workspace (Traditional) - look for settings.gradle
+            if path.join("settings.gradle").exists() {
                 return Ok(path);
             }
 
@@ -52,71 +32,54 @@ impl Workspace for LiferayProject {
                 break;
             }
         }
-        anyhow::bail!("Liferay project root not found.")
+        anyhow::bail!("Liferay project root (settings.gradle) not found.")
     }
 
-    fn detect_type(&self, root: &Path) -> ProjectType {
-        if root.join("liferay").exists() && root.join("webserver").exists() {
-            ProjectType::LiferayCloud
-        } else if root.join("client-extension.yaml").exists() {
-            ProjectType::ClientExtension
-        } else if root.join("bundles").exists() || root.join("gradle.properties").exists() {
-            ProjectType::LiferayWorkspace
-        } else {
-            ProjectType::Unknown
+    fn get_workspace_plugin_version(&self, root: &Path) -> anyhow::Result<String> {
+        let settings_gradle = root.join("settings.gradle");
+        if !settings_gradle.exists() {
+            anyhow::bail!("settings.gradle not found in {}", root.display());
         }
+
+        let content = fs::read_to_string(&settings_gradle)?;
+
+        // Regex to find: version: "16.0.1" or version: '16.0.1' inside the workspace plugin context
+        let re = Regex::new(r#"version:\s*["']([^"']+)["']"#)?;
+
+        // We look for the one near com.liferay.gradle.plugins.workspace
+        if let Some(caps) = re.captures(&content) {
+            return Ok(caps[1].to_string());
+        }
+
+        anyhow::bail!("Could not find workspace plugin version in settings.gradle")
     }
 
-    fn get_liferay_version(&self, root: &Path) -> Option<String> {
-        // Search in liferay/gradle.properties (LXC) or root gradle.properties (Workspace)
-        let paths = vec![
-            root.join("liferay").join("gradle.properties"),
-            root.join("gradle.properties"),
-        ];
+    fn update_workspace_plugin_version(
+        &self,
+        root: &Path,
+        new_version: &str,
+    ) -> anyhow::Result<()> {
+        let settings_gradle = root.join("settings.gradle");
+        let content = fs::read_to_string(&settings_gradle)?;
 
-        for path in paths {
-            if let Ok(content) = fs::read_to_string(path) {
-                for line in content.lines() {
-                    if line.starts_with("liferay.workspace.product=") {
-                        let product = line.split('=').nth(1)?.trim();
-                        // Basic mapping
-                        if product.contains("7.4") || product.starts_with("dxp-202") {
-                            return Some("7.4".to_string());
-                        }
-                        if product.contains("7.3") {
-                            return Some("7.3".to_string());
-                        }
-                        if product.contains("7.2") {
-                            return Some("7.2".to_string());
-                        }
-                        if product.contains("7.1") {
-                            return Some("7.1".to_string());
-                        }
-                    }
-                }
-            }
-        }
-        None
-    }
+        // Regex for name: "com.liferay.gradle.plugins.workspace", version: "16.0.1"
+        // or name: 'com.liferay.gradle.plugins.workspace', version: '16.0.1'
+        let re = Regex::new(
+            r#"(name:\s*["']com\.liferay\.gradle\.plugins\.workspace["'],\s*version:\s*)(["'])([^"']+)(["'])"#,
+        )?;
 
-    fn find_tomcat(&self, root: &Path) -> anyhow::Result<PathBuf> {
-        let bundles = root.join("bundles");
-        if !bundles.exists() {
-            anyhow::bail!("No 'bundles' directory found in root: {:?}", root);
+        if !re.is_match(&content) {
+            anyhow::bail!("Could not find workspace plugin definition in settings.gradle");
         }
 
-        for entry in fs::read_dir(bundles)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                let name = path.file_name().unwrap_or_default().to_string_lossy();
-                if name.starts_with("tomcat-") {
-                    return Ok(path);
-                }
-            }
-        }
+        let new_content = re.replace(&content, |caps: &regex::Captures| {
+            format!("{}{}{}{}", &caps[1], &caps[2], new_version, &caps[4])
+        });
 
-        anyhow::bail!("No 'tomcat-*' directory found inside 'bundles'")
+        fs::write(&settings_gradle, new_content.to_string())
+            .context("Failed to write updated settings.gradle")?;
+
+        Ok(())
     }
 }
 
@@ -126,30 +89,62 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn test_detection() {
+    fn test_find_root() {
         let dir = tempdir().unwrap();
         let root = dir.path();
-        fs::create_dir(root.join("liferay")).unwrap();
-        fs::create_dir(root.join("webserver")).unwrap();
+        fs::write(root.join("settings.gradle"), "").unwrap();
+
+        let sub_dir = root.join("modules").join("my-module");
+        fs::create_dir_all(&sub_dir).unwrap();
 
         let project = LiferayProject {
-            current_dir: root.to_path_buf(),
+            current_dir: sub_dir,
         };
-        assert_eq!(project.detect_type(root), ProjectType::LiferayCloud);
+        let found = project.find_root().unwrap();
+        assert_eq!(found, root);
     }
 
     #[test]
-    fn test_find_tomcat() {
+    fn test_get_workspace_plugin_version() {
         let dir = tempdir().unwrap();
         let root = dir.path();
-        let bundles = root.join("bundles");
-        let tomcat = bundles.join("tomcat-9.0.82");
-        fs::create_dir_all(&tomcat).unwrap();
+        let content = r#"
+buildscript {
+	dependencies {
+		classpath group: "com.liferay", name: "com.liferay.gradle.plugins.workspace", version: "16.0.1"
+	}
+}
+"#;
+        fs::write(root.join("settings.gradle"), content).unwrap();
 
         let project = LiferayProject {
             current_dir: root.to_path_buf(),
         };
-        let found = project.find_tomcat(root).unwrap();
-        assert_eq!(found, tomcat);
+        let version = project.get_workspace_plugin_version(root).unwrap();
+        assert_eq!(version, "16.0.1");
+    }
+
+    #[test]
+    fn test_update_workspace_plugin_version() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+        let content = r#"
+buildscript {
+	dependencies {
+		classpath group: "com.liferay", name: "com.liferay.gradle.plugins.workspace", version: "16.0.1"
+	}
+}
+"#;
+        fs::write(root.join("settings.gradle"), content).unwrap();
+
+        let project = LiferayProject {
+            current_dir: root.to_path_buf(),
+        };
+        project
+            .update_workspace_plugin_version(root, "17.0.0")
+            .unwrap();
+
+        let updated_content = fs::read_to_string(root.join("settings.gradle")).unwrap();
+        assert!(updated_content.contains(r#"version: "17.0.0""#));
     }
 }

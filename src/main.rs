@@ -3,48 +3,89 @@ mod core;
 mod utils;
 
 use crate::cli::{App, AppCommands};
-use crate::core::{LiferayProject, ProjectType, Workspace};
+use crate::core::{LiferayProject, Workspace};
+use crate::utils::fetch_latest_version;
 use clap::Parser;
+use std::io::{self, Write};
+use std::path::PathBuf;
 
 fn main() -> anyhow::Result<()> {
     let args = App::parse();
 
-    let ws = LiferayProject {
-        current_dir: std::env::current_dir().unwrap_or_default(),
-    };
-
     match args.command {
-        AppCommands::Env { target } => {
-            let root = ws.find_root()?;
-            let project_type = ws.detect_type(&root);
+        AppCommands::Update { yes, path } => {
+            let current_dir = path.map(PathBuf::from).unwrap_or(std::env::current_dir()?);
+            let project = LiferayProject { current_dir };
+            let root = project.find_root()?;
 
-            println!("Root: {:?}", root);
+            let local_version = project.get_workspace_plugin_version(&root)?;
+            let remote_version = fetch_latest_version()?;
 
-            let project_desc = match project_type {
-                ProjectType::LiferayWorkspace => "Liferay Workspace (Traditional)",
-                ProjectType::LiferayCloud => "Liferay Cloud (LXC/DXP Cloud)",
-                ProjectType::ClientExtension => "Liferay Client Extension",
-                ProjectType::Unknown => "Unknown project structure",
-            };
-            println!("Project Type: {}", project_desc);
+            if local_version == remote_version {
+                println!(
+                    "The Liferay Workspace plugin is already up to date (version {}).",
+                    local_version
+                );
+            } else {
+                println!("A new version of the Liferay Workspace plugin is available!");
+                println!("Local version:  {}", local_version);
+                println!("Latest version: {}", remote_version);
 
-            if let Some(version) = ws.get_liferay_version(&root) {
-                println!("Liferay Version: {}", version);
+                let proceed = if yes {
+                    true
+                } else {
+                    print!("\nDo you wish to proceed with the update? [y/N]: ");
+                    io::stdout().flush()?;
+                    let mut input = String::new();
+                    io::stdin().read_line(&mut input)?;
+                    input.trim().to_lowercase() == "y"
+                };
+
+                if proceed {
+                    project.update_workspace_plugin_version(&root, &remote_version)?;
+                    println!(
+                        "Successfully updated to version {} in settings.gradle",
+                        remote_version
+                    );
+                } else {
+                    println!("Update cancelled.");
+                }
             }
-
-            if let Ok(tomcat_path) = ws.find_tomcat(&root) {
-                println!("Tomcat Directory: {:?}", tomcat_path);
-            }
-
-            if let Some(t) = target {
-                println!("Checking environment for: {}", t);
-            }
-
-            // Example using the XML utility
-            let _ = utils::find_elements_by_name;
         }
-        AppCommands::Data { force } => {
-            println!("Data operation initiated (Force={})", force);
+        AppCommands::Version {
+            remote,
+            local,
+            path,
+        } => {
+            if remote && local {
+                let current_dir = path.map(PathBuf::from).unwrap_or(std::env::current_dir()?);
+                let project = LiferayProject { current_dir };
+                let root = project.find_root()?;
+                let l_v = project.get_workspace_plugin_version(&root)?;
+                let r_v = fetch_latest_version()?;
+                println!("local: {}, remote: {}", l_v, r_v);
+            } else if remote {
+                let r_v = fetch_latest_version()?;
+                println!("{}", r_v);
+            } else if local {
+                let current_dir = path.map(PathBuf::from).unwrap_or(std::env::current_dir()?);
+                let project = LiferayProject { current_dir };
+                let root = project.find_root()?;
+                let l_v = project.get_workspace_plugin_version(&root)?;
+                println!("{}", l_v);
+            } else {
+                // Default to showing both if no flag specified
+                let current_dir = path.map(PathBuf::from).unwrap_or(std::env::current_dir()?);
+                let project = LiferayProject { current_dir };
+                let root = project.find_root()?;
+                let l_v = project
+                    .get_workspace_plugin_version(&root)
+                    .unwrap_or_else(|_| "Unknown".to_string());
+                let r_v = fetch_latest_version().unwrap_or_else(|_| "Unknown".to_string());
+                println!("Liferay Workspace Plugin Version:");
+                println!("  Local:  {}", l_v);
+                println!("  Remote: {}", r_v);
+            }
         }
     }
 

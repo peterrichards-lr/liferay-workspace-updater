@@ -1,8 +1,11 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "lfr-tool")]
-#[command(about = "Generic Liferay Rust Tool", long_about = None)]
+#[command(name = "lwu")]
+#[command(
+    about = "Liferay Workspace Updater",
+    long_about = "A CLI tool to automatically update the Liferay Workspace Gradle plugin to its latest version."
+)]
 pub struct App {
     #[command(subcommand)]
     pub command: AppCommands,
@@ -10,14 +13,28 @@ pub struct App {
 
 #[derive(Subcommand)]
 pub enum AppCommands {
-    /// Generic environment command
-    Env {
+    /// Check for updates and apply them to settings.gradle
+    Update {
+        /// Apply updates without prompting for confirmation
         #[arg(short, long)]
-        target: Option<String>,
+        yes: bool,
+
+        /// Specify the path to the Liferay workspace (defaults to current directory)
+        #[arg(short, long)]
+        path: Option<String>,
     },
-    /// Generic data command
-    Data {
-        #[arg(long)]
-        force: bool,
+    /// Display version information
+    Version {
+        /// Display the latest version available on Nexus
+        #[arg(short, long)]
+        remote: bool,
+
+        /// Display the version currently in settings.gradle
+        #[arg(short, long)]
+        local: bool,
+
+        /// Specify the path to the Liferay workspace (defaults to current directory)
+        #[arg(short, long)]
+        path: Option<String>,
     },
 }

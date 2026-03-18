@@ -1,22 +1,32 @@
-use edit_xml::{Document, Element};
+use anyhow::Context;
+use roxmltree::Document;
 
-pub fn find_elements_by_name(doc: &Document, name: &str) -> Vec<Element> {
-    let mut results = Vec::new();
-    let root = match doc.root_element() {
-        Some(r) => r,
-        None => return results,
-    };
+const NEXUS_METADATA_URL: &str = "https://repository-cdn.liferay.com/nexus/content/groups/public/com/liferay/com.liferay.gradle.plugins.workspace/maven-metadata.xml";
 
-    let mut stack: Vec<Element> = vec![root];
-    while let Some(el) = stack.pop() {
-        if el.name(doc) == name {
-            results.push(el);
-        }
-        for child in el.children(doc) {
-            if let Some(child_el) = child.as_element() {
-                stack.push(child_el);
-            }
-        }
+/// Fetches the latest version from Liferay's Nexus metadata
+pub fn fetch_latest_version() -> anyhow::Result<String> {
+    let response = reqwest::blocking::get(NEXUS_METADATA_URL)
+        .context("Failed to fetch Maven metadata from Liferay Nexus")?;
+
+    if !response.status().is_success() {
+        anyhow::bail!("Failed to fetch Maven metadata: HTTP {}", response.status());
     }
-    results
+
+    let xml = response.text().context("Failed to read response body")?;
+    let doc = Document::parse(&xml).context("Failed to parse Maven metadata XML")?;
+
+    let version = doc
+        .descendants()
+        .find(|n| n.has_tag_name("release"))
+        .and_then(|n| n.text())
+        .map(|s| s.to_string())
+        .or_else(|| {
+            doc.descendants()
+                .find(|n| n.has_tag_name("latest"))
+                .and_then(|n| n.text())
+                .map(|s| s.to_string())
+        })
+        .context("Could not find latest or release version in metadata")?;
+
+    Ok(version)
 }
