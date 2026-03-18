@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 #[command(name = "lwu")]
 #[command(
     about = "Liferay Workspace Updater",
-    long_about = "A CLI tool to automatically update the Liferay Workspace Gradle plugin to its latest version."
+    long_about = "A CLI tool to automatically update Liferay Workspace components to their latest versions."
 )]
 pub struct App {
     #[command(subcommand)]
@@ -13,15 +13,33 @@ pub struct App {
 
 #[derive(Subcommand)]
 pub enum AppCommands {
-    /// Check for updates and apply them to settings.gradle
+    /// Check for updates and apply them
     Update {
         /// Apply updates without prompting for confirmation
         #[arg(short, long)]
         yes: bool,
 
+        /// Update the Liferay Workspace Gradle plugin (default)
+        #[arg(short, long)]
+        plugin: bool,
+
+        /// Update the liferay.workspace.product in gradle.properties
+        #[arg(long)]
+        product: bool,
+
         /// Specify the path to the Liferay workspace (defaults to current directory)
         #[arg(short, long)]
         path: Option<String>,
+    },
+    /// Run health checks and recommend improvements
+    Doctor {
+        /// Specify the path to the Liferay workspace (defaults to current directory)
+        #[arg(short, long)]
+        path: Option<String>,
+
+        /// Automatically fix issues where possible
+        #[arg(long)]
+        fix: bool,
     },
     /// Display version information
     Version {

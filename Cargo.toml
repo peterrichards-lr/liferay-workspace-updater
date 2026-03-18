@@ -10,7 +10,6 @@ description = "A CLI tool to automatically update the Liferay Workspace Gradle p
 clap = { version = "4.4", features = ["derive"] }
 
 # XML Processing (Crucial for Tomcat/Liferay configs)
-edit-xml = "0.1"
 roxmltree = "0.19"
 
 # Error handling
@@ -25,7 +24,7 @@ chrono = "0.4"    # Timestamps for logs/backups
 regex = "1.10"    # For parsing Gradle files
 
 # Optional dependencies for features
-reqwest = { version = "0.11", features = ["blocking"], optional = true }
+reqwest = { version = "0.11", default-features = false, features = ["blocking", "rustls-tls", "json"], optional = true }
 scraper = { version = "0.18", optional = true }
 serde_yaml = { version = "0.9", optional = true }
 

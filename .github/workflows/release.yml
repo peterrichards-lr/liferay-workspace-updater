@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     name: Build (${{ matrix.target }})
@@ -22,7 +25,7 @@ jobs:
             target: aarch64-apple-darwin
             artifact_name: lwu
             asset_name: lwu-macos-arm64.tar.gz
-          - os: macos-13
+          - os: macos-latest
             target: x86_64-apple-darwin
             artifact_name: lwu
             asset_name: lwu-macos-x86_64.tar.gz
@@ -43,18 +46,21 @@ jobs:
       - name: Build binary
         run: cargo build --release --locked --target ${{ matrix.target }}
 
+      - name: Debug Build Output
+        run: |
+          ls -R target/${{ matrix.target }}/release/ || true
+        shell: bash
+
       - name: Package (Unix)
         if: runner.os != 'Windows'
         run: |
-          cd target/${{ matrix.target }}/release
-          tar -czvf ../../../${{ matrix.asset_name }} ${{ matrix.artifact_name }}
+          tar -czvf ${{ matrix.asset_name }} -C target/${{ matrix.target }}/release ${{ matrix.artifact_name }}
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          cd target/${{ matrix.target }}/release
-          Compress-Archive -Path ${{ matrix.artifact_name }} -DestinationPath ../../../${{ matrix.asset_name }}
+          Compress-Archive -Path target/${{ matrix.target }}/release/${{ matrix.artifact_name }} -DestinationPath ${{ matrix.asset_name }}
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -79,6 +85,9 @@ jobs:
         with:
           merge-multiple: true
           path: assets
+
+      - name: Debug Assets
+        run: ls -R assets/
 
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v2
