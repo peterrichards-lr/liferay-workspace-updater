@@ -1,8 +1,8 @@
 # lwu
 
-[![GitHub Release](https://img.shields.io/github/v/release/peterrichards-lr/lwu)](https://github.com/peterrichards-lr/lwu/releases)
-[![License](https://img.shields.io/github/license/peterrichards-lr/lwu)](https://github.com/peterrichards-lr/lwu/LICENSE)
-[![Rust CI](https://github.com/peterrichards-lr/lwu/actions/workflows/rust.yml/badge.svg)](https://github.com/peterrichards-lr/lwu/actions/workflows/rust.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/peterrichards-lr/liferay-workspace-updater)](https://github.com/peterrichards-lr/liferay-workspace-updater/releases)
+[![License](https://img.shields.io/github/license/peterrichards-lr/liferay-workspace-updater)](https://github.com/peterrichards-lr/liferay-workspace-updater/LICENSE)
+[![Rust CI](https://github.com/peterrichards-lr/liferay-workspace-updater/actions/workflows/rust.yml/badge.svg)](https://github.com/peterrichards-lr/liferay-workspace-updater/actions/workflows/rust.yml)
 
 **lwu** (Liferay Workspace Updater) is a CLI tool designed to automatically update the Liferay Workspace Gradle plugin to its latest version by fetching the most recent metadata from Liferay's Nexus CDN.
 
@@ -38,7 +38,7 @@ brew install lwu
 
 ### Manual Download
 
-Download the latest binary for your platform from the [GitHub Releases](https://github.com/peterrichards-lr/lwu/releases) page.
+Download the latest binary for your platform from the [GitHub Releases](https://github.com/peterrichards-lr/liferay-workspace-updater/releases) page.
 
 ### Build from Source
 
