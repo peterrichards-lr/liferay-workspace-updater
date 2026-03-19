@@ -16,6 +16,6 @@ jobs:
       - name: Format Check
         run: cargo fmt --all -- --check
       - name: Lint with Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - name: Run Tests
-        run: cargo test --all-features --verbose
+        run: cargo test --locked --all-features --verbose
