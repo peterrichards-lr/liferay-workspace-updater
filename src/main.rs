@@ -196,7 +196,10 @@ fn main() -> anyhow::Result<()> {
                     .get_workspace_plugin_version(&root)
                     .unwrap_or_else(|_| "Unknown".to_string());
                 let r_v = fetch_latest_version().unwrap_or_else(|_| "Unknown".to_string());
-                println!("Liferay Workspace Plugin Version:");
+
+                println!("Liferay Workspace Updater (lwu):");
+                println!("  Version: {}", env!("CARGO_PKG_VERSION"));
+                println!("\nLiferay Workspace Plugin Version:");
                 println!("  Local:  {}", l_v);
                 println!("  Remote: {}", r_v);
 

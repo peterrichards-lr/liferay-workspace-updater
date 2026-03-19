@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(name = "lwu")]
+#[command(version)]
 #[command(
     about = "Liferay Workspace Updater",
     long_about = "A CLI tool to automatically update Liferay Workspace components to their latest versions."
