@@ -21,7 +21,7 @@ pub enum AppCommands {
         yes: bool,
 
         /// Update the Liferay Workspace Gradle plugin (default)
-        #[arg(short, long)]
+        #[arg(long)]
         plugin: bool,
 
         /// Update the liferay.workspace.product in gradle.properties
@@ -56,4 +56,15 @@ pub enum AppCommands {
         #[arg(short, long)]
         path: Option<String>,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::App;
+    use clap::CommandFactory;
+
+    #[test]
+    fn cli_definition_is_valid() {
+        App::command().debug_assert();
+    }
 }
