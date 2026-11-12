@@ -147,7 +147,7 @@ lwu doctor --path /path/to/my/workspace
 
    The release workflow fails if the tag isn't annotated, doesn't match `Cargo.toml`, or has no `CHANGELOG.md` section.
 
-4. Update the distribution channels using `.gemini/prompts/update-distribution-channels.md` (Homebrew formula `Formula/lwu.rb` in the tap). The Scoop bucket picks up later releases automatically because the `lwu` manifest already exists.
+4. The Homebrew tap and Scoop bucket pick up the new release automatically within a couple of hours. `.gemini/prompts/update-distribution-channels.md` is only needed for a tool's first release.
 
 ## Disclaimer
 
